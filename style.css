@@ -1,0 +1,307 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* ─── RESET & BASE ─── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+:root {
+  --safe-top:    env(safe-area-inset-top,    0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,   0px);
+  --safe-right:  env(safe-area-inset-right,  0px);
+  --hud-h: 40px;
+  --ctrl-h: 140px;
+  --gold: #ffe066;
+  --red:  #e40058;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #1a0a2e;
+  font-family: 'Press Start 2P', monospace;
+  color: #fff;
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none; user-select: none;
+}
+
+/* ─── HUD ─── */
+#ui-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 300;
+  pointer-events: none;
+  padding-top: var(--safe-top);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+#hud {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  height: var(--hud-h);
+  background: linear-gradient(180deg,rgba(0,0,0,.9) 0%,rgba(0,0,0,0) 100%);
+  padding: 0 10px;
+  font-size: 10px;
+  color: var(--gold);
+  gap: 4px;
+}
+#hud span { white-space: nowrap; }
+
+/* ─── CANVAS ─── */
+#gameCanvas {
+  display: none;
+  position: fixed;
+  top: calc(var(--safe-top) + var(--hud-h));
+  left: var(--safe-left);
+  right: var(--safe-right);
+  /* height fills space between HUD and controls */
+  width: calc(100% - var(--safe-left) - var(--safe-right));
+  height: calc(100% - var(--safe-top) - var(--hud-h) - var(--ctrl-h) - var(--safe-bottom));
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: none;
+  z-index: 10;
+}
+
+/* ─── SCREENS ─── */
+.screen {
+  display: none;
+  position: fixed;
+  inset: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 18px;
+  padding: 24px;
+  padding-top: calc(var(--safe-top) + 24px);
+  padding-bottom: calc(var(--safe-bottom) + 24px);
+  background: linear-gradient(160deg, #1a0a2e 0%, #2e0a18 100%);
+  z-index: 500;
+  animation: fadeIn .35s ease;
+}
+.screen.active { display: flex; }
+@keyframes fadeIn { from{opacity:0;transform:scale(.96)} to{opacity:1;transform:scale(1)} }
+
+/* Title */
+.title-logo { line-height: 1.1; }
+.logo-shadow { font-size: clamp(10px,3vw,14px); color: var(--gold); letter-spacing: 5px; }
+.logo-main   {
+  font-size: clamp(38px, 10vw, 60px);
+  color: #ff3d00;
+  text-shadow: 4px 4px 0 #c62828, 8px 8px 0 #7c0000;
+}
+.logo-sub    { font-size: clamp(14px,3.5vw,22px); color:#fff; letter-spacing:4px; margin-top:4px; }
+
+.pixel-mario-anim { font-size: clamp(44px,10vw,64px); animation: bounce .6s infinite alternate; }
+@keyframes bounce { to{transform:translateY(-14px)} }
+
+.blink { animation: blink 1s step-start infinite; color: var(--gold); font-size: 11px; }
+@keyframes blink { 50%{opacity:0} }
+
+.controls-hint {
+  display: flex; gap: 10px; font-size: 8px; color: #888;
+  flex-wrap: wrap; justify-content: center;
+}
+
+.big-btn {
+  background: var(--red);
+  color: #fff;
+  border: 3px solid #ff80ab;
+  border-radius: 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  padding: 14px 32px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #8c0030, 0 0 20px #e40058aa;
+  transition: transform .08s, box-shadow .08s;
+  min-width: 180px;
+}
+.big-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #8c0030; }
+
+#screen-gameover h1 { font-size: clamp(24px,7vw,40px); color:#ff1744; text-shadow:3px 3px 0 #7f0000; }
+#screen-win      h1 { font-size: clamp(20px,6vw,34px); color: var(--gold); text-shadow:3px 3px 0 #ff6f00; }
+.screen p { font-size: 13px; color: var(--gold); }
+
+/* Install banner */
+#install-banner {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 9px;
+  color: #ddd;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 320px;
+}
+#install-banner button {
+  background: var(--gold);
+  color: #1a0a2e;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+#btn-install-dismiss {
+  background: transparent !important;
+  color: #aaa !important;
+  font-size: 12px !important;
+  padding: 4px 8px !important;
+}
+
+/* ─── PAUSE BUTTON ─── */
+#btn-pause {
+  display: none;
+  position: fixed;
+  top: calc(var(--safe-top) + 4px);
+  right: calc(var(--safe-right) + 8px);
+  z-index: 400;
+  background: rgba(0,0,0,.5);
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  width: 36px; height: 36px;
+  cursor: pointer;
+  pointer-events: all;
+}
+body.playing #btn-pause { display: flex; align-items:center; justify-content:center; }
+
+/* ─── D-PAD ─── */
+#dpad {
+  display: none;
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 12px);
+  left: calc(var(--safe-left) + 12px);
+  z-index: 400;
+  flex-direction: column;
+  gap: 2px;
+}
+body.playing #dpad { display: flex; }
+
+.dpad-row {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+}
+.dpad-btn {
+  width: 52px; height: 52px;
+  background: rgba(30,20,60,.85);
+  border: 2px solid rgba(255,255,255,.25);
+  border-radius: 10px;
+  color: rgba(255,255,255,.9);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items:center; justify-content:center;
+  box-shadow: 0 3px 0 rgba(0,0,0,.5);
+  transition: background .05s;
+  pointer-events: all;
+}
+.dpad-btn:active, .dpad-btn.pressed {
+  background: rgba(228,0,88,.6);
+  transform: scale(.93);
+  box-shadow: none;
+}
+.dpad-center {
+  width: 52px; height: 52px;
+  background: rgba(20,10,40,.5);
+  border-radius: 8px;
+}
+
+/* ─── ACTION BUTTONS ─── */
+#action-btns {
+  display: none;
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 12px);
+  right: calc(var(--safe-right) + 12px);
+  z-index: 400;
+  flex-direction: row;
+  gap: 14px;
+  align-items: flex-end;
+}
+body.playing #action-btns { display: flex; }
+
+.action-btn {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  border: none;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 13px;
+  font-weight: bold;
+  color: #fff;
+  cursor: pointer;
+  display: flex; flex-direction:column; align-items:center; justify-content:center;
+  line-height: 1.1;
+  box-shadow: 0 5px 0 rgba(0,0,0,.5);
+  transition: transform .05s, box-shadow .05s;
+  pointer-events: all;
+}
+.action-btn span { font-size: 6px; opacity: .8; margin-top: 2px; }
+.action-btn:active, .action-btn.pressed {
+  transform: scale(.91) translateY(3px);
+  box-shadow: 0 2px 0 rgba(0,0,0,.4);
+}
+.btn-a {
+  background: radial-gradient(circle at 35% 35%, #ff6090, #d4003a);
+  box-shadow: 0 5px 0 #7c0020, 0 0 12px #ff005588;
+  width: 70px; height: 70px; /* slightly bigger = Jump */
+  margin-bottom: 8px;
+}
+.btn-b {
+  background: radial-gradient(circle at 35% 35%, #ffe066, #d49800);
+  box-shadow: 0 5px 0 #7c5800, 0 0 12px #ffb30088;
+  color: #1a0a2e;
+}
+
+/* ─── LANDSCAPE LAYOUT ─── */
+/* On wide screens: canvas fills above the ctrl strip */
+@media (orientation: landscape) {
+  :root { --ctrl-h: 130px; }
+  #dpad    { bottom: calc(var(--safe-bottom) + 8px); }
+  #action-btns { bottom: calc(var(--safe-bottom) + 8px); }
+  .dpad-btn { width: 46px; height: 46px; }
+  .action-btn { width: 56px; height: 56px; }
+  .btn-a { width: 64px; height: 64px; }
+}
+
+/* ─── PORTRAIT HINT ─── */
+#portrait-hint {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #1a0a2e;
+  z-index: 9999;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  font-size: 13px;
+  text-align: center;
+  padding: 30px;
+}
+#portrait-hint .rotate-icon { font-size: 52px; animation: rotateHint 1.5s infinite ease-in-out; }
+@keyframes rotateHint { 0%{transform:rotate(0)} 40%{transform:rotate(90deg)} 100%{transform:rotate(90deg)} }
+
+/* Show portrait hint only on real phones in portrait */
+@media (max-width: 500px) and (orientation: portrait) {
+  #portrait-hint { display: flex; }
+}
+
+/* ─── DESKTOP: cap canvas nicely ─── */
+@media (min-width: 900px) {
+  #gameCanvas {
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(100%, 900px);
+  }
+  #dpad    { left: calc(50% - 450px + var(--safe-left) + 12px); }
+  #action-btns { right: calc(50% - 450px + var(--safe-right) + 12px); }
+}
