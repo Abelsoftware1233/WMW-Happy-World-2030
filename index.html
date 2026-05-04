@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Mario JS" />
+  <meta name="theme-color" content="#1a0a2e" />
+  <title>Super Mario World JS</title>
+  <style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* ─── RESET & BASE ─── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+:root {
+  --safe-top:    env(safe-area-inset-top,    0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,   0px);
+  --safe-right:  env(safe-area-inset-right,  0px);
+  --hud-h: 40px;
+  --ctrl-h: 140px;
+  --gold: #ffe066;
+  --red:  #e40058;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #1a0a2e;
+  font-family: 'Press Start 2P', monospace;
+  color: #fff;
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none; user-select: none;
+}
+
+/* ─── HUD ─── */
+#ui-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 300;
+  pointer-events: none;
+  padding-top: var(--safe-top);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+#hud {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  height: var(--hud-h);
+  background: linear-gradient(180deg,rgba(0,0,0,.9) 0%,rgba(0,0,0,0) 100%);
+  padding: 0 10px;
+  font-size: 10px;
+  color: var(--gold);
+  gap: 4px;
+}
+#hud span { white-space: nowrap; }
+
+/* ─── CANVAS ─── */
+#gameCanvas {
+  display: none;
+  position: fixed;
+  top: calc(var(--safe-top) + var(--hud-h));
+  left: var(--safe-left);
+  right: var(--safe-right);
+  /* height fills space between HUD and controls */
+  width: calc(100% - var(--safe-left) - var(--safe-right));
+  height: calc(100% - var(--safe-top) - var(--hud-h) - var(--ctrl-h) - var(--safe-bottom));
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: none;
+  z-index: 10;
+}
+
+/* ─── SCREENS ─── */
+.screen {
+  display: none;
+  position: fixed;
+  inset: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 18px;
+  padding: 24px;
+  padding-top: calc(var(--safe-top) + 24px);
+  padding-bottom: calc(var(--safe-bottom) + 24px);
+  background: linear-gradient(160deg, #1a0a2e 0%, #2e0a18 100%);
+  z-index: 500;
+  animation: fadeIn .35s ease;
+}
+.screen.active { display: flex; }
+@keyframes fadeIn { from{opacity:0;transform:scale(.96)} to{opacity:1;transform:scale(1)} }
+
+/* Title */
+.title-logo { line-height: 1.1; }
+.logo-shadow { font-size: clamp(10px,3vw,14px); color: var(--gold); letter-spacing: 5px; }
+.logo-main   {
+  font-size: clamp(38px, 10vw, 60px);
+  color: #ff3d00;
+  text-shadow: 4px 4px 0 #c62828, 8px 8px 0 #7c0000;
+}
+.logo-sub    { font-size: clamp(14px,3.5vw,22px); color:#fff; letter-spacing:4px; margin-top:4px; }
+
+.pixel-mario-anim { font-size: clamp(44px,10vw,64px); animation: bounce .6s infinite alternate; }
+@keyframes bounce { to{transform:translateY(-14px)} }
+
+.blink { animation: blink 1s step-start infinite; color: var(--gold); font-size: 11px; }
+@keyframes blink { 50%{opacity:0} }
+
+.controls-hint {
+  display: flex; gap: 10px; font-size: 8px; color: #888;
+  flex-wrap: wrap; justify-content: center;
+}
+
+.big-btn {
+  background: var(--red);
+  color: #fff;
+  border: 3px solid #ff80ab;
+  border-radius: 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  padding: 14px 32px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #8c0030, 0 0 20px #e40058aa;
+  transition: transform .08s, box-shadow .08s;
+  min-width: 180px;
+}
+.big-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #8c0030; }
+
+#screen-gameover h1 { font-size: clamp(24px,7vw,40px); color:#ff1744; text-shadow:3px 3px 0 #7f0000; }
+#screen-win      h1 { font-size: clamp(20px,6vw,34px); color: var(--gold); text-shadow:3px 3px 0 #ff6f00; }
+.screen p { font-size: 13px; color: var(--gold); }
+
+/* Install banner */
+#install-banner {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 9px;
+  color: #ddd;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 320px;
+}
+#install-banner button {
+  background: var(--gold);
+  color: #1a0a2e;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+#btn-install-dismiss {
+  background: transparent !important;
+  color: #aaa !important;
+  font-size: 12px !important;
+  padding: 4px 8px !important;
+}
+
+/* ─── PAUSE BUTTON ─── */
+#btn-pause {
+  display: none;
+  position: fixed;
+  top: calc(var(--safe-top) + 4px);
+  right: calc(var(--safe-right) + 8px);
+  z-index: 400;
+  background: rgba(0,0,0,.5);
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  width: 36px; height: 36px;
+  cursor: pointer;
+  pointer-events: all;
+}
+body.playing #btn-pause { display: flex; align-items:center; justify-content:center; }
+
+/* ─── D-PAD ─── */
+#dpad {
+  display: none;
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 12px);
+  left: calc(var(--safe-left) + 12px);
+  z-index: 400;
+  flex-direction: column;
+  gap: 2px;
+}
+body.playing #dpad { display: flex; }
+
+.dpad-row {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+}
+.dpad-btn {
+  width: 52px; height: 52px;
+  background: rgba(30,20,60,.85);
+  border: 2px solid rgba(255,255,255,.25);
+  border-radius: 10px;
+  color: rgba(255,255,255,.9);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items:center; justify-content:center;
+  box-shadow: 0 3px 0 rgba(0,0,0,.5);
+  transition: background .05s;
+  pointer-events: all;
+}
+.dpad-btn:active, .dpad-btn.pressed {
+  background: rgba(228,0,88,.6);
+  transform: scale(.93);
+  box-shadow: none;
+}
+.dpad-center {
+  width: 52px; height: 52px;
+  background: rgba(20,10,40,.5);
+  border-radius: 8px;
+}
+
+/* ─── ACTION BUTTONS ─── */
+#action-btns {
+  display: none;
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 12px);
+  right: calc(var(--safe-right) + 12px);
+  z-index: 400;
+  flex-direction: row;
+  gap: 14px;
+  align-items: flex-end;
+}
+body.playing #action-btns { display: flex; }
+
+.action-btn {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  border: none;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 13px;
+  font-weight: bold;
+  color: #fff;
+  cursor: pointer;
+  display: flex; flex-direction:column; align-items:center; justify-content:center;
+  line-height: 1.1;
+  box-shadow: 0 5px 0 rgba(0,0,0,.5);
+  transition: transform .05s, box-shadow .05s;
+  pointer-events: all;
+}
+.action-btn span { font-size: 6px; opacity: .8; margin-top: 2px; }
+.action-btn:active, .action-btn.pressed {
+  transform: scale(.91) translateY(3px);
+  box-shadow: 0 2px 0 rgba(0,0,0,.4);
+}
+.btn-a {
+  background: radial-gradient(circle at 35% 35%, #ff6090, #d4003a);
+  box-shadow: 0 5px 0 #7c0020, 0 0 12px #ff005588;
+  width: 70px; height: 70px; /* slightly bigger = Jump */
+  margin-bottom: 8px;
+}
+.btn-b {
+  background: radial-gradient(circle at 35% 35%, #ffe066, #d49800);
+  box-shadow: 0 5px 0 #7c5800, 0 0 12px #ffb30088;
+  color: #1a0a2e;
+}
+.btn-y {
+  background: radial-gradient(circle at 35% 35%, #80e8ff, #0088cc);
+  box-shadow: 0 5px 0 #004466, 0 0 12px #00aaff88;
+  color: #fff;
+}
+
+/* ─── LANDSCAPE LAYOUT ─── */
+@media (orientation: landscape) {
+  :root { --ctrl-h: 130px; }
+  #dpad {
+    display: none;
+    bottom: calc(var(--safe-bottom) + 8px);
+    left: calc(var(--safe-left) + 12px);
+  }
+  body.playing #dpad { display: flex; }
+  #action-btns {
+    display: none;
+    bottom: calc(var(--safe-bottom) + 8px);
+    right: calc(var(--safe-right) + 12px);
+  }
+  body.playing #action-btns { display: flex; }
+  .dpad-btn { width: 46px; height: 46px; }
+  .action-btn { width: 52px; height: 52px; }
+  .btn-a { width: 60px; height: 60px; }
+}
+
+/* ─── PORTRAIT HINT ─── */
+#portrait-hint {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #1a0a2e;
+  z-index: 9999;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  font-size: 13px;
+  text-align: center;
+  padding: 30px;
+}
+#portrait-hint .rotate-icon { font-size: 52px; animation: rotateHint 1.5s infinite ease-in-out; }
+@keyframes rotateHint { 0%{transform:rotate(0)} 40%{transform:rotate(90deg)} 100%{transform:rotate(90deg)} }
+
+/* Portrait hint disabled – game works in both orientations */
+/* @media (max-width: 500px) and (orientation: portrait) {
+  #portrait-hint { display: flex; }
+} */
+
+/* ─── DESKTOP: cap canvas nicely ─── */
+@media (min-width: 900px) {
+  #gameCanvas {
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(100%, 900px);
+  }
+  #dpad        { left: max(calc(var(--safe-left) + 12px), calc(50% - 450px + 12px)); }
+  #action-btns { right: max(calc(var(--safe-right) + 12px), calc(50% - 450px + 12px)); }
+}
+
+  </style>
+</head>
+<body>
+
+  <div id="ui-overlay">
+    <div id="hud">
+      <span>&#x1F344; <span id="lives">3</span></span>
+      <span>&#x2B50; <span id="score">0</span></span>
+      <span>&#x1FA99; <span id="coins">0</span></span>
+      <span>&#x1F30D; <span id="level-num">1</span></span>
+      <span>&#x23F1; <span id="timer">300</span></span>
+    </div>
+  </div>
+
+  <div id="screen-start" class="screen active">
+    <div class="title-logo">
+      <div class="logo-shadow">SUPER</div>
+      <div class="logo-main">MARIO</div>
+      <div class="logo-sub">WORLD JS</div>
+    </div>
+    <div class="pixel-mario-anim">&#x1F344;</div>
+    <button class="big-btn" id="btn-play">&#x25B6; SPELEN</button>
+    <div class="controls-hint">
+      <span>&larr; &rarr; Lopen</span>
+      <span>&#x25B2; / Z = Springen</span>
+      <span>X/B = Rennen</span>
+      <span>C/Y = Schieten</span>
+    </div>
+    <div id="install-banner">
+      <span>&#x1F4F2; Voeg toe aan beginscherm</span>
+      <button id="btn-install">Installeer</button>
+      <button id="btn-install-dismiss">&#x2715;</button>
+    </div>
+  </div>
+
+  <div id="screen-gameover" class="screen">
+    <h1>GAME OVER</h1>
+    <p>Score: <span id="final-score">0</span></p>
+    <button class="big-btn" id="btn-retry">&#x21A9; OPNIEUW</button>
+  </div>
+
+  <div id="screen-win" class="screen">
+    <h1>&#x1F389; GEWONNEN!</h1>
+    <p>Score: <span id="win-score">0</span></p>
+    <button class="big-btn" id="btn-again">&#x25B6; NOGMAALS</button>
+  </div>
+
+  <div id="portrait-hint">
+    <div class="rotate-icon">&#x1F4F1;</div>
+    <p>Draai je telefoon</p>
+    <p style="font-size:9px;color:#888">Dit spel speelt in landscape</p>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <button id="btn-pause">&#x23F8;</button>
+
+  <div id="dpad">
+    <div class="dpad-row">
+      <div></div>
+      <button class="dpad-btn" id="btn-up">&#x25B2;</button>
+      <div></div>
+    </div>
+    <div class="dpad-row">
+      <button class="dpad-btn" id="btn-left">&#x25C4;</button>
+      <div class="dpad-center"></div>
+      <button class="dpad-btn" id="btn-right">&#x25BA;</button>
+    </div>
+    <div class="dpad-row">
+      <div></div>
+      <button class="dpad-btn" id="btn-down">&#x25BC;</button>
+      <div></div>
+    </div>
+  </div>
+
+  <div id="action-btns">
+    <button class="action-btn btn-b" id="btn-run">B<br><span>Ren</span></button>
+    <button class="action-btn btn-y" id="btn-shoot">Y<br><span>Schiet</span></button>
+    <button class="action-btn btn-a" id="btn-jump">A<br><span>Spring</span></button>
+  </div>
+
+  <script>
+
+// ═══════════════════════════════════════════════════
+//  SUPER MARIO WORLD JS  –  Full Game Engine
+// ═══════════════════════════════════════════════════
+
+const canvas  = document.getElementById('gameCanvas');
+const ctx     = canvas.getContext('2d');
+
+// ── Screens & HUD refs ──
+const screenStart    = document.getElementById('screen-start');
+const screenGameover = document.getElementById('screen-gameover');
+const screenWin      = document.getElementById('screen-win');
+const hudLives  = document.getElementById('lives');
+const hudScore  = document.getElementById('score');
+const hudCoins  = document.getElementById('coins');
+const hudLevel  = document.getElementById('level-num');
+const hudTimer  = document.getElementById('timer');
+const finalScore= document.getElementById('final-score');
+const winScore  = document.getElementById('win-score');
+
+// ── Canvas size ──
+const CANVAS_W = 800;
+const CANVAS_H = 450;
+canvas.width  = CANVAS_W;
+canvas.height = CANVAS_H;
+
+// ── Physics constants ──
+const GRAVITY       = 0.55;
+const JUMP_FORCE    = -13;
+const MOVE_SPEED    = 3.2;
+const RUN_SPEED     = 5.5;
+const MAX_FALL      = 16;
+const TILE          = 32;
+
+// ── Palette ──
+const PAL = {
+  sky1: '#5c94fc', sky2: '#3060c0',
+  ground: '#c84c0c', groundTop: '#52a800',
+  brick: '#b45020', brickLight: '#e87038',
+  qblock: '#f8b800', qblockLight: '#fce860',
+  pipe: '#00a800', pipeLight: '#00e000',
+  coin: '#f8b800',
+  mario: '#e40058', marioHat: '#e40058',
+  goomba: '#b45020',
+  koopa: '#00a800',
+  mushroom: '#e40058',
+  fireFlower: '#ff6000',
+  star: '#f8f800',
+  cloud: '#fcfcfc',
+  mountain: '#00a800',
+  flag: '#f8f800',
+  lava: '#e82000',
+  castle: '#888',
+  info: '#fff',
+};
+
+// ═══════════════════════════════════════════════════
+//  TILE TYPES
+// ═══════════════════════════════════════════════════
+const T = {
+  AIR:    0,
+  GROUND: 1,
+  BRICK:  2,
+  QBLOCK: 3,  // question block with coin
+  QBLOCK_MUSHROOM: 4,
+  QBLOCK_STAR: 5,
+  QBLOCK_FLOWER: 6,
+  PIPE_TOP_L: 7,
+  PIPE_TOP_R: 8,
+  PIPE_L:     9,
+  PIPE_R:     10,
+  QUSED:  11, // used question block
+  LAVA:   12,
+  CASTLE: 13,
+  COIN_TILE: 14,
+  SOLID_INVIS: 15, // invisible solid (for castle floor)
+};
+
+// ═══════════════════════════════════════════════════
+//  LEVEL DEFINITIONS
+//  Each level: { name, bg, tiles[][], enemies[], width }
+//  Tiles are stored row-major [row][col]
+//  ROWS = 14, COLS = level.width
+// ═══════════════════════════════════════════════════
+
+const ROWS = 14;
+
+function makeEmpty(w) {
+  return Array.from({length: ROWS}, () => new Array(w).fill(0));
+}
+
+/* ── helper: place pipe starting at col c, floor row f ── */
+function placePipe(tiles, c, floorRow, height) {
+  if (height === undefined) height = 3;
+  for (let r = floorRow - height; r < floorRow; r++) {
+    if (r < 0) continue;
+    if (r === floorRow - height) {
+      tiles[r][c]   = T.PIPE_TOP_L;
+      tiles[r][c+1] = T.PIPE_TOP_R;
+    } else {
+      tiles[r][c]   = T.PIPE_L;
+      tiles[r][c+1] = T.PIPE_R;
+    }
+  }
+}
+
+/* ── helper: ground row from col a to b (inclusive) ── */
+function groundRow(tiles, row, a, b) {
+  for (let c = a; c <= b; c++) tiles[row][c] = T.GROUND;
+}
+
+// ─────────────────────────────────────────────────
+//  LEVEL 1 – Grassland
+// ─────────────────────────────────────────────────
+function buildLevel1() {
+  const W = 120;
+  const t = makeEmpty(W);
+  const floor = 12;
+
+  // Main floor
+  for (let c = 0; c < W; c++) {
+    if (c >= 20 && c <= 22) continue; // gap
+    if (c >= 55 && c <= 57) continue; // gap
+    t[floor][c] = T.GROUND;
+    t[floor+1][c] = T.GROUND;
+  }
+
+  // Platforms
+  for (let c = 5; c <= 8; c++) t[9][c] = T.BRICK;
+  for (let c = 14; c <= 17; c++) t[8][c] = T.BRICK;
+
+  // Q-blocks
+  t[8][6]  = T.QBLOCK;
+  t[8][7]  = T.QBLOCK_MUSHROOM;
+  t[8][16] = T.QBLOCK;
+  t[7][11] = T.QBLOCK_STAR;
+
+  // Coin tiles
+  for (let c = 25; c <= 30; c++) t[9][c] = T.COIN_TILE;
+
+  // Pipes
+  placePipe(t, 35, floor, 3);
+  placePipe(t, 40, floor, 4);
+  placePipe(t, 45, floor, 3);
+
+  // Bricks high platform
+  for (let c = 60; c <= 65; c++) t[8][c] = T.BRICK;
+  t[8][62] = T.QBLOCK_FLOWER;
+
+  // More ground islands
+  groundRow(t, floor, 70, 75);
+  groundRow(t, floor, 80, 90);
+  for (let c = 85; c <= 87; c++) t[9][c] = T.BRICK;
+  t[8][85] = T.QBLOCK;
+
+  // Staircase to flag
+  for (let s = 0; s < 6; s++) {
+    for (let r = floor - s; r <= floor; r++) t[r][W-10+s] = T.GROUND;
+  }
+  // Flag pole col
+  const fp = W - 3;
+  for (let r = 3; r <= floor; r++) t[r][fp] = T.SOLID_INVIS;
+
+  const enemies = [
+    {type:'goomba', x: 8*TILE, y: (floor-1)*TILE},
+    {type:'goomba', x: 12*TILE, y: (floor-1)*TILE},
+    {type:'goomba', x: 27*TILE, y: (floor-1)*TILE},
+    {type:'koopa',  x: 33*TILE, y: (floor-1)*TILE},
+    {type:'goomba', x: 48*TILE, y: (floor-1)*TILE},
+    {type:'goomba', x: 50*TILE, y: (floor-1)*TILE},
+    {type:'koopa',  x: 63*TILE, y: (floor-1)*TILE},
+    {type:'goomba', x: 72*TILE, y: (floor-1)*TILE},
+    {type:'goomba', x: 82*TILE, y: (floor-1)*TILE},
+    {type:'koopa',  x: 88*TILE, y: (floor-1)*TILE},
+  ];
+
+  return {name:'World 1-1', bg:'sky', tiles:t, width:W, floorRow:floor, flagCol:fp,
+          startX:2*TILE, startY:(floor-1)*TILE, enemies, music:'overworld'};
+}
+
+// ─────────────────────────────────────────────────
+//  LEVEL 2 – Desert / Underground
+// ─────────────────────────────────────────────────
+function buildLevel2() {
+  const W = 130;
+  const t = makeEmpty(W);
+  const floor = 12;
+
+  // Ceiling (cave feel)
+  for (let c = 0; c < W; c++) {
+    t[0][c] = T.BRICK;
+    t[1][c] = T.BRICK;
+  }
+
+  // Floor
+  for (let c = 0; c < W; c++) {
+    if (c >= 15 && c <= 17) continue;
+    if (c >= 40 && c <= 43) continue;
+    if (c >= 75 && c <= 78) continue;
+    t[floor][c] = T.GROUND;
+    t[floor+1][c] = T.GROUND;
+  }
+
+  // Platforms
+  for (let c = 10; c <= 14; c++) t[9][c] = T.BRICK;
+  for (let c = 20; c <= 24; c++) t[9][c] = T.BRICK;
+  for (let c = 18; c <= 22; c++) t[7][c] = T.BRICK;
+  t[7][20] = T.QBLOCK_MUSHROOM;
+  t[7][22] = T.QBLOCK;
+
+  // Coins
+  for (let c = 30; c <= 38; c++) t[9][c] = T.COIN_TILE;
+
+  // Lava pits
+  for (let c = 15; c <= 17; c++) { t[floor][c]=T.LAVA; t[floor+1][c]=T.LAVA; }
+  for (let c = 40; c <= 43; c++) { t[floor][c]=T.LAVA; t[floor+1][c]=T.LAVA; }
+  for (let c = 75; c <= 78; c++) { t[floor][c]=T.LAVA; t[floor+1][c]=T.LAVA; }
+
+  // Pipes
+  placePipe(t, 50, floor, 4);
+  placePipe(t, 60, floor, 3);
+
+  // Q-blocks row
+  for (let c = 55; c <= 59; c++) t[5][c] = T.QBLOCK;
+  t[5][57] = T.QBLOCK_STAR;
+
+  // Upper path
+  for (let c = 85; c <= 100; c++) t[7][c] = T.BRICK;
+  t[7][90] = T.QBLOCK_FLOWER;
+  t[7][95] = T.QBLOCK;
+
+  // Staircase to flag
+  for (let s = 0; s < 6; s++) {
+    for (let r = floor - s; r <= floor; r++) t[r][W-10+s] = T.GROUND;
+  }
+  const fp = W - 3;
+  for (let r = 3; r <= floor; r++) t[r][fp] = T.SOLID_INVIS;
+
+  const enemies = [
+    {type:'goomba', x: 5*TILE,  y:(floor-1)*TILE},
+    {type:'goomba', x: 7*TILE,  y:(floor-1)*TILE},
+    {type:'koopa',  x: 22*TILE, y:(floor-1)*TILE},
+    {type:'goomba', x: 30*TILE, y:(floor-1)*TILE},
+    {type:'koopa',  x: 45*TILE, y:(floor-1)*TILE},
+    {type:'goomba', x: 52*TILE, y:(floor-1)*TILE},
+    {type:'goomba', x: 54*TILE, y:(floor-1)*TILE},
+    {type:'koopa',  x: 65*TILE, y:(floor-1)*TILE},
+    {type:'goomba', x: 80*TILE, y:(floor-1)*TILE},
+    {type:'koopa',  x: 95*TILE, y: 6*TILE},
+    {type:'goomba', x:105*TILE, y:(floor-1)*TILE},
+  ];
+
+  return {name:'World 1-2', bg:'cave', tiles:t, width:W, floorRow:floor, flagCol:fp,
+          startX:2*TILE, startY:(floor-1)*TILE, enemies, music:'underground'};
+}
+
+// ─────────────────────────────────────────────────
+//  LEVEL 3 – Sky / Cloud World
+// ─────────────────────────────────────────────────
+function buildLevel3() {
+  const W = 140;
+  const t = makeEmpty(W);
+  const floor = 12;
+
+  // Floating cloud platforms (bricks)
+  const platforms = [
+    [10,8,4],[10,14,5],[9,22,6],[10,30,4],[9,36,5],
+    [8,43,6],[10,52,4],[9,58,5],[8,65,6],[10,75,4],
+    [9,83,5],[8,90,6],[10,100,4],[9,107,5],[8,115,6]
+  ];
+  for (const [r,c,len] of platforms) {
+    for (let i = 0; i < len; i++) t[r][c+i] = T.BRICK;
+  }
+
+  // Ground islands
+  groundRow(t, floor, 0, 5);
+  groundRow(t, floo
