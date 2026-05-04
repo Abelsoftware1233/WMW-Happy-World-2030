@@ -272,16 +272,30 @@ body.playing #action-btns { display: flex; }
   box-shadow: 0 5px 0 #7c5800, 0 0 12px #ffb30088;
   color: #1a0a2e;
 }
+.btn-y {
+  background: radial-gradient(circle at 35% 35%, #80e8ff, #0088cc);
+  box-shadow: 0 5px 0 #004466, 0 0 12px #00aaff88;
+  color: #fff;
+}
 
 /* ─── LANDSCAPE LAYOUT ─── */
-/* On wide screens: canvas fills above the ctrl strip */
 @media (orientation: landscape) {
   :root { --ctrl-h: 130px; }
-  #dpad    { bottom: calc(var(--safe-bottom) + 8px); }
-  #action-btns { bottom: calc(var(--safe-bottom) + 8px); }
+  #dpad {
+    display: none;
+    bottom: calc(var(--safe-bottom) + 8px);
+    left: calc(var(--safe-left) + 12px);
+  }
+  body.playing #dpad { display: flex; }
+  #action-btns {
+    display: none;
+    bottom: calc(var(--safe-bottom) + 8px);
+    right: calc(var(--safe-right) + 12px);
+  }
+  body.playing #action-btns { display: flex; }
   .dpad-btn { width: 46px; height: 46px; }
-  .action-btn { width: 56px; height: 56px; }
-  .btn-a { width: 64px; height: 64px; }
+  .action-btn { width: 52px; height: 52px; }
+  .btn-a { width: 60px; height: 60px; }
 }
 
 /* ─── PORTRAIT HINT ─── */
@@ -314,8 +328,8 @@ body.playing #action-btns { display: flex; }
     transform: translateX(-50%);
     width: min(100%, 900px);
   }
-  #dpad    { left: calc(50% - 450px + var(--safe-left) + 12px); }
-  #action-btns { right: calc(50% - 450px + var(--safe-right) + 12px); }
+  #dpad        { left: max(calc(var(--safe-left) + 12px), calc(50% - 450px + 12px)); }
+  #action-btns { right: max(calc(var(--safe-right) + 12px), calc(50% - 450px + 12px)); }
 }
 
   </style>
@@ -343,7 +357,8 @@ body.playing #action-btns { display: flex; }
     <div class="controls-hint">
       <span>&larr; &rarr; Lopen</span>
       <span>&#x25B2; / Z = Springen</span>
-      <span>B = Rennen / Schieten</span>
+      <span>X/B = Rennen</span>
+      <span>C/Y = Schieten</span>
     </div>
     <div id="install-banner">
       <span>&#x1F4F2; Voeg toe aan beginscherm</span>
@@ -394,6 +409,7 @@ body.playing #action-btns { display: flex; }
 
   <div id="action-btns">
     <button class="action-btn btn-b" id="btn-run">B<br><span>Ren</span></button>
+    <button class="action-btn btn-y" id="btn-shoot">Y<br><span>Schiet</span></button>
     <button class="action-btn btn-a" id="btn-jump">A<br><span>Spring</span></button>
   </div>
 
@@ -1307,8 +1323,8 @@ function updatePlayer() {
     if (player.vy < -5) player.vy += 0.5;
   }
 
-  // Fireball shoot
-  if ((keys['KeyX'] || touchState.run) && player.state === 'fire') {
+  // Fireball shoot — Y button OR KeyC/KeyV, separate from run
+  if ((keys['KeyC'] || keys['KeyV'] || touchState.shoot) && player.state === 'fire') {
     if (!player._shootCool || player._shootCool <= 0) {
       shootFireball();
       player._shootCool = 22;
@@ -2093,7 +2109,7 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => { keys[e.code] = false; });
 
 // ── Touch controls (D-pad + action buttons) ──
-const touchState = { left:false, right:false, jump:false, run:false };
+const touchState = { left:false, right:false, jump:false, run:false, shoot:false };
 
 function bindBtn(id, prop) {
   const btn = document.getElementById(id);
@@ -2113,6 +2129,7 @@ bindBtn('btn-right', 'right');
 bindBtn('btn-up',    'jump');
 bindBtn('btn-jump',  'jump');   // alias
 bindBtn('btn-run',   'run');
+bindBtn('btn-shoot', 'shoot');
 
 // ── Canvas resize: fills the slot between HUD and controls ──
 function resizeCanvas() {
@@ -2143,6 +2160,12 @@ document.addEventListener('visibilitychange', function() {
 showScreen(screenStart);
 requestAnimationFrame(gameLoop);
 
+// ── Button wiring (here to guarantee they run after all functions defined) ──
+document.getElementById('btn-play') .addEventListener('click', function() { startGame(); });
+document.getElementById('btn-retry').addEventListener('click', function() { startGame(); });
+document.getElementById('btn-again').addEventListener('click', function() { startGame(); });
+document.getElementById('btn-pause').addEventListener('click', function() { togglePause(); });
+
 
   </script>
   <script>
@@ -2159,10 +2182,6 @@ requestAnimationFrame(gameLoop);
     document.getElementById('btn-install-dismiss').addEventListener('click', function() {
       document.getElementById('install-banner').style.display = 'none';
     });
-    document.getElementById('btn-play').addEventListener('click', function() { if (window._startGame) window._startGame(); });
-    document.getElementById('btn-retry').addEventListener('click', function() { if (window._startGame) window._startGame(); });
-    document.getElementById('btn-again').addEventListener('click', function() { if (window._startGame) window._startGame(); });
-    document.getElementById('btn-pause').addEventListener('click', function() { if (window._togglePause) window._togglePause(); });
     document.addEventListener('touchmove', function(e) { if(e.touches.length>1) e.preventDefault(); }, {passive:false});
     document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
   </script>
